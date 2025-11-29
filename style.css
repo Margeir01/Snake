@@ -32,3 +32,36 @@ button {
   cursor: pointer;
   border-radius: 4px;
 }
+
+.player-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 0.9rem;
+}
+
+.player-bar input {
+  padding: 3px 6px;
+  font-size: 0.9rem;
+}
+
+.player-bar button {
+  padding: 3px 8px;
+  font-size: 0.8rem;
+}
+
+.leaderboard {
+  margin-top: 15px;
+  font-size: 0.9rem;
+}
+
+.leaderboard h2 {
+  margin: 5px 0;
+  font-size: 1rem;
+}
+
+.leaderboard ol {
+  padding-left: 20px;
+  margin: 0;
+}

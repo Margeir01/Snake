@@ -11,9 +11,23 @@
     <h1>Snake</h1>
     <p>Bruk piltastene for å styre 🐍</p>
 
+    <div class="player-bar">
+        <div>
+            spiller: <span id="currentPlayerName">Ingen</span>
+        </div>
+        <div id="nameForm">
+            <input id="playerNameInput" type="text" placeholder="Skriv navnet ditt">
+            <button id="saveNameBtn">Lagre navn</button>
+        </div>
+    </div>
+
     <canvas id="game" width="400" height="400"></canvas>
     
     <div class="info">
+        <section class="leaderboard">
+            <h2>Leaderboard</h2>
+            <ol id="leaderboardList"></ol>
+        </section>
   <span>Score: <span id="score">0</span></span>
   <span>Highscore: <span id="highscore">0</span></span>
   <button id="restart">Restart</button>
@@ -23,4 +37,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-
