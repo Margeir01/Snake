@@ -8,12 +8,23 @@
 </head>
 
 <body>
-    <h1>Snake</h1>
-    <p>Bruk piltastene for å styre 🐍</p>
+    <h1 id="title">Snake</h1>
+    <p id="subtitle">Bruk piltastene eller WASD for å styre 🐍</p>
+    <p id="pauseInfo">Trykk SPACE for å pause</p>
+
+    <!-- Språkvalg -->
+    <div class="lang-switch">
+        <label for="languageSelect" id="langLabel">language:</label>
+        <select id="languageSelect">
+            <option value="no">Norsk</option>
+            <option value="en">English</option>
+        </select>
+    </div>
 
     <div class="player-bar">
         <div>
-            spiller: <span id="currentPlayerName">Ingen</span>
+            <span id="playerLabel">Spiller:</span>
+            <span id="currentPlayerName">Ingen</span>
         </div>
         <div id="nameForm">
             <input id="playerNameInput" type="text" placeholder="Skriv navnet ditt">
@@ -21,18 +32,51 @@
         </div>
     </div>
 
-    <canvas id="game" width="400" height="400"></canvas>
-    
+    <!-- WRAPPER rundt canvas + meny over spillet -->
+    <div class="game-wrapper">
+        <canvas id="game" width="600" height="600"></canvas>
+
+
+        <!-- meny som ligger OVER spillet -->
+        <div id="game-menu" class="menu-overlay">
+            <h2 id="menuTitle">Settings</h2>
+
+            <label>
+                <span id="appleCountLabel">Antall epler</span>:
+                <select id="appleCount">
+                    <option value="1">1</option>
+                    <option value="3">3</option>
+                    <option value="5">5</option>
+                </select>
+            </label>
+
+            <label>
+                <input type="checkbox" id="wrapToggle">
+                <span id="wrapLabel">Gå gjennom vegger</span>
+            </label>
+
+            <p class="menu-hint" id="menuHint">
+                Tips: spillet er automatisk pauset mens menyen er åpen.
+            </p>
+
+            <div class="menu-buttons">
+                <button type="button" id="menuCloseBtn">Lukk meny</button>
+            </div>
+        </div>
+    </div>
+
     <div class="info">
         <section class="leaderboard">
-            <h2>Leaderboard</h2>
+            <h2 id="leaderboardTitle">Leaderboard</h2>
             <ol id="leaderboardList"></ol>
         </section>
-  <span>Score: <span id="score">0</span></span>
-  <span>Highscore: <span id="highscore">0</span></span>
-  <button id="restart">Restart</button>
-</div>
 
+        <span><span id="scoreLabel">Score:</span> <span id="score">0</span></span>
+        <span><span id="highscoreLabel">Highscore:</span> <span id="highscore">0</span></span>
+
+        <button id="pause">Pause</button>
+        <button id="restart">Restart</button>
+    </div>
 
     <script src="script.js"></script>
 </body>

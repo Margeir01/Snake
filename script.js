@@ -1,5 +1,63 @@
-// Alt kjører først når DOM-en er klar
+// Hele spillet kjører først når DOM-en er klar
 window.addEventListener("DOMContentLoaded", () => {
+  console.log("DOM loaded, starter snake-spill…");
+
+  // =======================================
+  // SPRÅK-TEKSTER
+  // =======================================
+  const translations = {
+    no: {
+      title: "Snake",
+      subtitle: "Bruk piltastene eller WASD for å styre 🐍",
+      langLabel: "Språk:",
+      playerLabel: "Spiller:",
+      namePlaceholder: "Skriv navnet ditt",
+      saveNameBtn: "Lagre navn",
+      menuTitle: "Innstillinger",
+      appleCountLabel: "Antall epler",
+      wrapLabel: "Gå gjennom vegger",
+      menuHint: "Tips: spillet er automatisk pauset mens menyen er åpen.",
+      menuCloseBtn: "Lukk meny",
+      leaderboardTitle: "Leaderboard",
+      scoreLabel: "Score:",
+      highscoreLabel: "Highscore:",
+      pauseLabelPause: "Pause",
+      pauseLabelResume: "Fortsett",
+      restartLabel: "Restart",
+      noScores: "Ingen scores ennå",
+      gameOver: "GAME OVER",
+      gameOverHint: "Trykk Restart",
+      pauseOverlay: "PAUSE",
+      pauseInfo: "Trykk SPACE for å pause"
+    },
+    en: {
+      title: "Snake",
+      subtitle: "Use the arrow keys or WASD to control 🐍",
+      langLabel: "Language:",
+      playerLabel: "Player:",
+      namePlaceholder: "Enter your name",
+      saveNameBtn: "Save name",
+      menuTitle: "Settings",
+      appleCountLabel: "Number of apples",
+      wrapLabel: "Walk through walls",
+      menuHint: "Tip: the game is automatically paused while the menu is open.",
+      menuCloseBtn: "Close menu",
+      leaderboardTitle: "Leaderboard",
+      scoreLabel: "Score:",
+      highscoreLabel: "High score:",
+      pauseLabelPause: "Pause",
+      pauseLabelResume: "Resume",
+      restartLabel: "Restart",
+      noScores: "No scores yet",
+      gameOver: "GAME OVER",
+      gameOverHint: "Press Restart",
+      pauseOverlay: "PAUSED",
+      pauseInfo: "Press SPACE to pause"
+    }
+  };
+
+  let currentLang = localStorage.getItem("snakeLang") || "no";
+
   // =======================================
   // FARGER
   // =======================================
@@ -29,7 +87,11 @@ window.addEventListener("DOMContentLoaded", () => {
     apple: new Image(),
   };
 
-  // bilder fra img-mappen (sørg for at filnavnene stemmer!)
+  // Bakgrunnsbilde
+  const backgroundImage = new Image();
+  backgroundImage.src = "img/bakgrunn.jpg";
+
+  // last inn sprites (sørg for at filnavn stemmer!)
   sprites.head_up.src = "img/head_up.png";
   sprites.head_down.src = "img/head_down.png";
   sprites.head_left.src = "img/head_left.png";
@@ -52,35 +114,52 @@ window.addEventListener("DOMContentLoaded", () => {
   // =======================================
   // DOM-REFERANSER
   // =======================================
+  const pauseInfoEl = document.getElementById("pauseInfo");
   const canvas = document.getElementById("game");
   const ctx = canvas.getContext("2d");
+
+  const titleEl = document.getElementById("title");
+  const subtitleEl = document.getElementById("subtitle");
+
+  const langLabelEl = document.getElementById("langLabel");
+  const languageSelect = document.getElementById("languageSelect");
+
   const scoreEl = document.getElementById("score");
   const highscoreEl = document.getElementById("highscore");
   const restartBtn = document.getElementById("restart");
+  const pauseBtn = document.getElementById("pause");
 
+  const scoreLabelEl = document.getElementById("scoreLabel");
+  const highscoreLabelEl = document.getElementById("highscoreLabel");
+
+  const playerLabelEl = document.getElementById("playerLabel");
   const playerNameInput = document.getElementById("playerNameInput");
   const saveNameBtn = document.getElementById("saveNameBtn");
   const currentPlayerNameEl = document.getElementById("currentPlayerName");
   const nameForm = document.getElementById("nameForm");
   const leaderboardList = document.getElementById("leaderboardList");
+  const leaderboardTitleEl = document.getElementById("leaderboardTitle");
 
-  console.log("Snake-spill startet, canvas:", canvas);
-
-  // sanity check på elementene
-  console.log("Navnefelt:", playerNameInput);
-  console.log("Lagre-knapp:", saveNameBtn);
-  console.log("Spiller-label:", currentPlayerNameEl);
+  // meny + settings
+  const menu = document.getElementById("game-menu");
+  const menuCloseBtn = document.getElementById("menuCloseBtn");
+  const appleCountSelect = document.getElementById("appleCount");
+  const wrapToggle = document.getElementById("wrapToggle");
+  const menuTitleEl = document.getElementById("menuTitle");
+  const appleCountLabelEl = document.getElementById("appleCountLabel");
+  const wrapLabelEl = document.getElementById("wrapLabel");
+  const menuHintEl = document.getElementById("menuHint");
 
   // =======================================
   // GRID / SPILLDATA
   // =======================================
-  const tileSize = 20;
-  const tileCount = canvas.width / tileSize;
+  const tileSize = 30;                        // størrelse på hver rute
+  const tileCount = canvas.width / tileSize;  // 600 / 30 = 20
 
   let snake = [
     { x: 10, y: 10 },
-    { x: 9, y: 10 },
-    { x: 8, y: 10 }
+    { x: 9,  y: 10 },
+    { x: 8,  y: 10 }
   ];
 
   let dx = 1;
@@ -88,7 +167,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   let directionQueue = [];
 
-  let food = randomFoodPosition();
+  let foods = [];          // flere epler
   let score = 0;
   let highscore = Number(localStorage.getItem("snakeHighscore")) || 0;
   highscoreEl.textContent = highscore;
@@ -96,50 +175,150 @@ window.addEventListener("DOMContentLoaded", () => {
   let playerName = localStorage.getItem("snakePlayerName") || "";
   let leaderboard = JSON.parse(localStorage.getItem("snakeLeaderboard") || "[]");
 
+  let wrapEnabled = wrapToggle ? wrapToggle.checked : false;
+
+  // antall epler styres av select
+  let appleCount = 1;
+  if (appleCountSelect) {
+    const val = parseInt(appleCountSelect.value, 10);
+    appleCount = isNaN(val) ? 1 : val;
+  }
+
+  let isGameOver = false;
+  let isPaused = false;
+  const speed = 130;
+  let gameInterval = setInterval(gameLoop, speed);
+
+  // =======================================
+  // SPRÅK-APPLIKASJON
+  // =======================================
+  function applyLanguage(lang) {
+    const t = translations[lang] || translations.no;
+    currentLang = lang;
+    localStorage.setItem("snakeLang", lang);
+
+    // topp
+    titleEl.textContent = t.title;
+    subtitleEl.textContent = t.subtitle;
+    pauseInfoEl.textContent = t.pauseInfo;
+
+    // språklabel
+    langLabelEl.textContent = t.langLabel;
+
+    // spiller / navn
+    playerLabelEl.textContent = t.playerLabel;
+    playerNameInput.placeholder = t.namePlaceholder;
+    saveNameBtn.textContent = t.saveNameBtn;
+
+    // meny
+    menuTitleEl.textContent = t.menuTitle;
+    appleCountLabelEl.textContent = t.appleCountLabel;
+    wrapLabelEl.textContent = t.wrapLabel;
+    menuHintEl.textContent = t.menuHint;
+    menuCloseBtn.textContent = t.menuCloseBtn;
+
+    // leaderboard / score
+    leaderboardTitleEl.textContent = t.leaderboardTitle;
+    scoreLabelEl.textContent = t.scoreLabel;
+    highscoreLabelEl.textContent = t.highscoreLabel;
+
+    // knapper
+    pauseBtn.textContent = isPaused ? t.pauseLabelResume : t.pauseLabelPause;
+    restartBtn.textContent = t.restartLabel;
+
+    // dropdown selected
+    if (languageSelect.value !== lang) {
+      languageSelect.value = lang;
+    }
+
+    draw();
+  }
+
+  // init språk
+  languageSelect.value = currentLang;
+  applyLanguage(currentLang);
+
   if (playerName) {
     currentPlayerNameEl.textContent = playerName;
     nameForm.style.display = "none";
   } else {
-    currentPlayerNameEl.textContent = "Ingen";
+    currentPlayerNameEl.textContent = currentLang === "no" ? "Ingen" : "None";
     nameForm.style.display = "flex";
   }
 
+  resetFoods();
   renderLeaderboard();
-
-  let isGameOver = false;
-  const speed = 130;
-  let gameInterval = setInterval(gameLoop, speed);
 
   // =======================================
   // EVENT LISTENERS
   // =======================================
   document.addEventListener("keydown", handleKeyDown);
-  restartBtn.addEventListener("click", restartGame);
 
-  saveNameBtn.addEventListener("click", () => {
-    console.log("Lagre-knapp trykket");
+  if (restartBtn) {
+    restartBtn.addEventListener("click", restartGame);
+  }
 
-    const name = playerNameInput.value.trim();
-    console.log("Navn i input:", name);
+  if (pauseBtn) {
+    pauseBtn.addEventListener("click", togglePause);
+  }
 
-    if (!name) {
-      console.log("Tomt navn, gjør ingenting");
-      return;
-    }
+  if (saveNameBtn) {
+    saveNameBtn.addEventListener("click", () => {
+      const name = playerNameInput.value.trim();
+      if (!name) return;
 
-    playerName = name;
-    localStorage.setItem("snakePlayerName", playerName);
-    console.log("Navn lagret i localStorage:", playerName);
+      playerName = name;
+      localStorage.setItem("snakePlayerName", playerName);
+      currentPlayerNameEl.textContent = playerName;
+      nameForm.style.display = "none";
+    });
+  }
 
-    currentPlayerNameEl.textContent = playerName;
-    nameForm.style.display = "none";
-  });
+  if (languageSelect) {
+    languageSelect.addEventListener("change", () => {
+      const lang = languageSelect.value;
+      applyLanguage(lang);
+      if (!playerName) {
+        currentPlayerNameEl.textContent = lang === "no" ? "Ingen" : "None";
+      }
+      renderLeaderboard();
+    });
+  }
+
+  if (menuCloseBtn) {
+    menuCloseBtn.addEventListener("click", () => {
+      console.log("Lukk meny klikket");
+      hideMenu();
+      isPaused = false;
+      applyLanguage(currentLang);
+    });
+  }
+
+  if (appleCountSelect) {
+    appleCountSelect.addEventListener("change", () => {
+      const val = parseInt(appleCountSelect.value, 10);
+      appleCount = isNaN(val) ? 1 : val;
+      resetFoods();
+    });
+  }
+
+  if (wrapToggle) {
+    wrapToggle.addEventListener("change", () => {
+      wrapEnabled = wrapToggle.checked;
+    });
+  }
 
   // =======================================
   // GAME LOOP
   // =======================================
   function gameLoop() {
     if (isGameOver) return;
+
+    if (isPaused) {
+      draw();
+      return;
+    }
+
     update();
     draw();
   }
@@ -154,11 +333,18 @@ window.addEventListener("DOMContentLoaded", () => {
       dy = nextDir.dy;
     }
 
-    const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+    let head = { x: snake[0].x + dx, y: snake[0].y + dy };
 
     if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
-      endGame();
-      return;
+      if (wrapEnabled) {
+        if (head.x < 0) head.x = tileCount - 1;
+        else if (head.x >= tileCount) head.x = 0;
+        if (head.y < 0) head.y = tileCount - 1;
+        else if (head.y >= tileCount) head.y = 0;
+      } else {
+        endGame();
+        return;
+      }
     }
 
     for (let i = 0; i < snake.length; i++) {
@@ -170,7 +356,15 @@ window.addEventListener("DOMContentLoaded", () => {
 
     snake.unshift(head);
 
-    if (head.x === food.x && head.y === food.y) {
+    let ateIndex = -1;
+    for (let i = 0; i < foods.length; i++) {
+      if (head.x === foods[i].x && head.y === foods[i].y) {
+        ateIndex = i;
+        break;
+      }
+    }
+
+    if (ateIndex !== -1) {
       score++;
       scoreEl.textContent = score;
 
@@ -180,7 +374,7 @@ window.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("snakeHighscore", highscore);
       }
 
-      food = randomFoodPosition();
+      foods[ateIndex] = randomFoodPosition(foods);
     } else {
       snake.pop();
     }
@@ -190,33 +384,52 @@ window.addEventListener("DOMContentLoaded", () => {
   // DRAW
   // =======================================
   function draw() {
-    ctx.fillStyle = colors.background;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const t = translations[currentLang] || translations.no;
 
-    ctx.drawImage(
-      sprites.apple,
-      food.x * tileSize,
-      food.y * tileSize,
-      tileSize,
-      tileSize
-    );
+    if (backgroundImage.complete) {
+      ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+    } else {
+      ctx.fillStyle = colors.background;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    for (const food of foods) {
+      ctx.drawImage(
+        sprites.apple,
+        food.x * tileSize,
+        food.y * tileSize,
+        tileSize,
+        tileSize
+      );
+    }
 
     for (let i = 0; i < snake.length; i++) {
       drawSnakeSegment(i);
     }
 
-    if (isGameOver) {
+    if (isPaused && !isGameOver) {
+      ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = colors.text;
       ctx.font = "24px system-ui";
       ctx.textAlign = "center";
-      ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+      ctx.fillText(t.pauseOverlay, canvas.width / 2, canvas.height / 2);
+    }
+
+    if (isGameOver) {
+      ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = colors.text;
+      ctx.font = "24px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(t.gameOver, canvas.width / 2, canvas.height / 2);
       ctx.font = "16px system-ui";
-      ctx.fillText("Trykk Restart", canvas.width / 2, canvas.height / 2 + 30);
+      ctx.fillText(t.gameOverHint, canvas.width / 2, canvas.height / 2 + 30);
     }
   }
 
   // =======================================
-  // TEGN SLANGE-SEGMENT
+  // SLANGE-SEGMENT
   // =======================================
   function drawSnakeSegment(index) {
     const segment = snake[index];
@@ -228,25 +441,22 @@ window.addEventListener("DOMContentLoaded", () => {
 
     if (isHead) {
       if (dx === 1 && dy === 0) return ctx.drawImage(sprites.head_right, px, py, tileSize, tileSize);
-      if (dx === -1 && dy === 0) return ctx.drawImage(sprites.head_left, px, py, tileSize, tileSize);
-      if (dy === -1 && dx === 0) return ctx.drawImage(sprites.head_up, px, py, tileSize, tileSize);
-      if (dy === 1 && dx === 0) return ctx.drawImage(sprites.head_down, px, py, tileSize, tileSize);
+      if (dx === -1 && dy === 0) return ctx.drawImage(sprites.head_left,  px, py, tileSize, tileSize);
+      if (dy === -1 && dx === 0) return ctx.drawImage(sprites.head_up,    px, py, tileSize, tileSize);
+      if (dy === 1  && dx === 0) return ctx.drawImage(sprites.head_down,  px, py, tileSize, tileSize);
     }
 
     if (isTail) {
       const prev = snake[index - 1];
-      if (prev.x < segment.x) return ctx.drawImage(sprites.tail_right, px, py, tileSize, tileSize);
-      if (prev.x > segment.x) return ctx.drawImage(sprites.tail_left, px, py, tileSize, tileSize);
-      if (prev.y < segment.y) return ctx.drawImage(sprites.tail_down, px, py, tileSize, tileSize);
-      if (prev.y > segment.y) return ctx.drawImage(sprites.tail_up, px, py, tileSize, tileSize);
+      if (prev.x < segment.x)  return ctx.drawImage(sprites.tail_right, px, py, tileSize, tileSize);
+      if (prev.x > segment.x)  return ctx.drawImage(sprites.tail_left,  px, py, tileSize, tileSize);
+      if (prev.y < segment.y)  return ctx.drawImage(sprites.tail_down,  px, py, tileSize, tileSize);
+      if (prev.y > segment.y)  return ctx.drawImage(sprites.tail_up,    px, py, tileSize, tileSize);
     }
 
     const prev = snake[index - 1];
     const next = snake[index + 1];
-
-    if (!prev || !next) {
-      return;
-    }
+    if (!prev || !next) return;
 
     if (prev.y === segment.y && next.y === segment.y) {
       return ctx.drawImage(sprites.body_horizontal, px, py, tileSize, tileSize);
@@ -281,6 +491,42 @@ window.addEventListener("DOMContentLoaded", () => {
   // STYRING
   // =======================================
   function handleKeyDown(e) {
+    if (document.activeElement === playerNameInput) {
+      return;
+    }
+
+    const t = translations[currentLang] || translations.no;
+
+    if (e.key === "p" || e.key === "P" || e.key === "Escape") {
+      e.preventDefault();
+      if (menu && menu.style.display === "block") {
+        hideMenu();
+        isPaused = false;
+        pauseBtn.textContent = t.pauseLabelPause;
+      } else {
+        showMenu();
+      }
+      return;
+    }
+
+    if (e.key === " " || e.key === "Spacebar") {
+      e.preventDefault();
+
+      if (menu && menu.style.display === "block") {
+        hideMenu();
+        isPaused = false;
+        pauseBtn.textContent = t.pauseLabelPause;
+      } else {
+        showMenu();
+      }
+
+      return;
+    }
+
+    if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+      e.preventDefault();
+    }
+
     if (isGameOver) return;
 
     let newDx = dx;
@@ -288,21 +534,33 @@ window.addEventListener("DOMContentLoaded", () => {
 
     switch (e.key) {
       case "ArrowUp":
+      case "w":
+      case "W":
         newDx = 0;
         newDy = -1;
         break;
+
       case "ArrowDown":
+      case "s":
+      case "S":
         newDx = 0;
         newDy = 1;
         break;
+
       case "ArrowLeft":
+      case "a":
+      case "A":
         newDx = -1;
         newDy = 0;
         break;
+
       case "ArrowRight":
+      case "d":
+      case "D":
         newDx = 1;
         newDy = 0;
         break;
+
       default:
         return;
     }
@@ -330,11 +588,60 @@ window.addEventListener("DOMContentLoaded", () => {
   // =======================================
   // HJELPEFUNKSJONER
   // =======================================
-  function randomFoodPosition() {
-    return {
-      x: Math.floor(Math.random() * tileCount),
-      y: Math.floor(Math.random() * tileCount)
-    };
+  function randomFoodPosition(blockedFoods = []) {
+    let newPos;
+    let isOnSnake;
+    let isOnOtherFood;
+
+    do {
+      newPos = {
+        x: Math.floor(Math.random() * tileCount),
+        y: Math.floor(Math.random() * tileCount)
+      };
+
+      isOnSnake = snake.some(segment => segment.x === newPos.x && segment.y === newPos.y);
+      isOnOtherFood = blockedFoods.some(f => f.x === newPos.x && f.y === newPos.y);
+
+    } while (isOnSnake || isOnOtherFood);
+
+    return newPos;
+  }
+
+  function resetFoods() {
+    foods = [];
+    const count = appleCount > 0 ? appleCount : 1;
+
+    for (let i = 0; i < count; i++) {
+      foods.push(randomFoodPosition(foods));
+    }
+  }
+
+  function togglePause() {
+    if (isGameOver) return;
+    const t = translations[currentLang] || translations.no;
+    isPaused = !isPaused;
+    if (pauseBtn) {
+      pauseBtn.textContent = isPaused ? t.pauseLabelResume : t.pauseLabelPause;
+    }
+  }
+
+  function showMenu() {
+    const t = translations[currentLang] || translations.no;
+    console.log("Vis meny");
+    if (menu) {
+      menu.style.display = "block";
+    }
+    isPaused = true;
+    if (pauseBtn) {
+      pauseBtn.textContent = t.pauseLabelResume;
+    }
+  }
+
+  function hideMenu() {
+    console.log("Skjul meny");
+    if (menu) {
+      menu.style.display = "none";
+    }
   }
 
   function endGame() {
@@ -368,11 +675,13 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function renderLeaderboard() {
+    const t = translations[currentLang] || translations.no;
+
     leaderboardList.innerHTML = "";
 
     if (leaderboard.length === 0) {
       const li = document.createElement("li");
-      li.textContent = "Ingen scores ennå";
+      li.textContent = t.noScores;
       leaderboardList.appendChild(li);
       return;
     }
@@ -387,16 +696,21 @@ window.addEventListener("DOMContentLoaded", () => {
   function restartGame() {
     snake = [
       { x: 10, y: 10 },
-      { x: 9, y: 10 },
-      { x: 8, y: 10 }
+      { x: 9,  y: 10 },
+      { x: 8,  y: 10 }
     ];
     dx = 1;
     dy = 0;
     directionQueue = [];
-    food = randomFoodPosition();
+    resetFoods();
     score = 0;
     scoreEl.textContent = score;
     isGameOver = false;
+    isPaused = false;
+    const t = translations[currentLang] || translations.no;
+    if (pauseBtn) {
+      pauseBtn.textContent = t.pauseLabelPause;
+    }
 
     clearInterval(gameInterval);
     gameInterval = setInterval(gameLoop, speed);
