@@ -214,7 +214,7 @@ button:active {
   background: linear-gradient(135deg, #ef4444, #f97316);
 }
 
-/* ======== RESPONSIV LITT ======== */
+/* ======== RESPONSIV ======== */
 @media (max-width: 750px) {
   .game-card {
     transform: scale(0.9);

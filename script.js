@@ -26,7 +26,7 @@ window.addEventListener("DOMContentLoaded", () => {
       restartLabel: "Restart",
       noScores: "Ingen scores ennå",
       gameOver: "GAME OVER",
-      gameOverHint: "Trykk Restart",
+      gameOverHint: "Trykk Restart eller SPACE",
       pauseOverlay: "PAUSE",
       pauseInfo: "Trykk SPACE for å pause"
     },
@@ -50,7 +50,7 @@ window.addEventListener("DOMContentLoaded", () => {
       restartLabel: "Restart",
       noScores: "No scores yet",
       gameOver: "GAME OVER",
-      gameOverHint: "Press Restart",
+      gameOverHint: "Press Restart or SPACE",
       pauseOverlay: "PAUSED",
       pauseInfo: "Press SPACE to pause"
     }
@@ -153,13 +153,13 @@ window.addEventListener("DOMContentLoaded", () => {
   // =======================================
   // GRID / SPILLDATA
   // =======================================
-  const tileSize = 30;                        // størrelse på hver rute
-  const tileCount = canvas.width / tileSize;  // 600 / 30 = 20
+  const tileSize = 30;
+  const tileCount = canvas.width / tileSize; // 480 / 30 = 16
 
   let snake = [
-    { x: 10, y: 10 },
-    { x: 9,  y: 10 },
-    { x: 8,  y: 10 }
+    { x: 8, y: 8 },
+    { x: 7, y: 8 },
+    { x: 6, y: 8 }
   ];
 
   let dx = 1;
@@ -167,7 +167,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   let directionQueue = [];
 
-  let foods = [];          // flere epler
+  let foods = [];
   let score = 0;
   let highscore = Number(localStorage.getItem("snakeHighscore")) || 0;
   highscoreEl.textContent = highscore;
@@ -177,7 +177,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   let wrapEnabled = wrapToggle ? wrapToggle.checked : false;
 
-  // antall epler styres av select
   let appleCount = 1;
   if (appleCountSelect) {
     const val = parseInt(appleCountSelect.value, 10);
@@ -185,7 +184,8 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   let isGameOver = false;
-  let isPaused = false;
+  let isPaused = true; // starter pauset
+
   const speed = 130;
   let gameInterval = setInterval(gameLoop, speed);
 
@@ -197,36 +197,29 @@ window.addEventListener("DOMContentLoaded", () => {
     currentLang = lang;
     localStorage.setItem("snakeLang", lang);
 
-    // topp
     titleEl.textContent = t.title;
     subtitleEl.textContent = t.subtitle;
     pauseInfoEl.textContent = t.pauseInfo;
 
-    // språklabel
     langLabelEl.textContent = t.langLabel;
 
-    // spiller / navn
     playerLabelEl.textContent = t.playerLabel;
     playerNameInput.placeholder = t.namePlaceholder;
     saveNameBtn.textContent = t.saveNameBtn;
 
-    // meny
     menuTitleEl.textContent = t.menuTitle;
     appleCountLabelEl.textContent = t.appleCountLabel;
     wrapLabelEl.textContent = t.wrapLabel;
     menuHintEl.textContent = t.menuHint;
     menuCloseBtn.textContent = t.menuCloseBtn;
 
-    // leaderboard / score
     leaderboardTitleEl.textContent = t.leaderboardTitle;
     scoreLabelEl.textContent = t.scoreLabel;
     highscoreLabelEl.textContent = t.highscoreLabel;
 
-    // knapper
     pauseBtn.textContent = isPaused ? t.pauseLabelResume : t.pauseLabelPause;
     restartBtn.textContent = t.restartLabel;
 
-    // dropdown selected
     if (languageSelect.value !== lang) {
       languageSelect.value = lang;
     }
@@ -234,7 +227,6 @@ window.addEventListener("DOMContentLoaded", () => {
     draw();
   }
 
-  // init språk
   languageSelect.value = currentLang;
   applyLanguage(currentLang);
 
@@ -266,7 +258,6 @@ window.addEventListener("DOMContentLoaded", () => {
     saveNameBtn.addEventListener("click", () => {
       const name = playerNameInput.value.trim();
       if (!name) return;
-
       playerName = name;
       localStorage.setItem("snakePlayerName", playerName);
       currentPlayerNameEl.textContent = playerName;
@@ -290,7 +281,8 @@ window.addEventListener("DOMContentLoaded", () => {
       console.log("Lukk meny klikket");
       hideMenu();
       isPaused = false;
-      applyLanguage(currentLang);
+      const t = translations[currentLang] || translations.no;
+      pauseBtn.textContent = t.pauseLabelPause;
     });
   }
 
@@ -429,7 +421,7 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   // =======================================
-  // SLANGE-SEGMENT
+  // SLANGE-SEGMENT (GRID-BASERT, INGEN SMOOTH)
   // =======================================
   function drawSnakeSegment(index) {
     const segment = snake[index];
@@ -439,6 +431,7 @@ window.addEventListener("DOMContentLoaded", () => {
     const px = segment.x * tileSize;
     const py = segment.y * tileSize;
 
+    // HODE
     if (isHead) {
       if (dx === 1 && dy === 0) return ctx.drawImage(sprites.head_right, px, py, tileSize, tileSize);
       if (dx === -1 && dy === 0) return ctx.drawImage(sprites.head_left,  px, py, tileSize, tileSize);
@@ -446,6 +439,7 @@ window.addEventListener("DOMContentLoaded", () => {
       if (dy === 1  && dx === 0) return ctx.drawImage(sprites.head_down,  px, py, tileSize, tileSize);
     }
 
+    // HALE
     if (isTail) {
       const prev = snake[index - 1];
       if (prev.x < segment.x)  return ctx.drawImage(sprites.tail_right, px, py, tileSize, tileSize);
@@ -458,14 +452,17 @@ window.addEventListener("DOMContentLoaded", () => {
     const next = snake[index + 1];
     if (!prev || !next) return;
 
+    // Rett horisontal
     if (prev.y === segment.y && next.y === segment.y) {
       return ctx.drawImage(sprites.body_horizontal, px, py, tileSize, tileSize);
     }
 
+    // Rett vertikal
     if (prev.x === segment.x && next.x === segment.x) {
       return ctx.drawImage(sprites.body_vertical, px, py, tileSize, tileSize);
     }
 
+    // Hjørner
     if ((prev.x < segment.x && next.y < segment.y) ||
         (next.x < segment.x && prev.y < segment.y)) {
       return ctx.drawImage(sprites.body_topleft, px, py, tileSize, tileSize);
@@ -497,6 +494,22 @@ window.addEventListener("DOMContentLoaded", () => {
 
     const t = translations[currentLang] || translations.no;
 
+    // GAME OVER: SPACE / ENTER / R = restart
+    if (isGameOver) {
+      if (
+        e.key === " " ||
+        e.key === "Spacebar" ||
+        e.key === "Enter" ||
+        e.key === "r" ||
+        e.key === "R"
+      ) {
+        e.preventDefault();
+        restartGame();
+      }
+      return;
+    }
+
+    // MENY (P / ESC)
     if (e.key === "p" || e.key === "P" || e.key === "Escape") {
       e.preventDefault();
       if (menu && menu.style.display === "block") {
@@ -509,25 +522,33 @@ window.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    // SPACE: start spill / toggle meny
     if (e.key === " " || e.key === "Spacebar") {
       e.preventDefault();
 
+      // Spillet er pauset, ingen meny → start spill
+      if (isPaused && (!menu || menu.style.display !== "block")) {
+        isPaused = false;
+        pauseBtn.textContent = t.pauseLabelPause;
+        return;
+      }
+
+      // Hvis menyen er åpen → lukk
       if (menu && menu.style.display === "block") {
         hideMenu();
         isPaused = false;
         pauseBtn.textContent = t.pauseLabelPause;
-      } else {
-        showMenu();
+        return;
       }
 
+      // ellers: åpne meny
+      showMenu();
       return;
     }
 
     if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
       e.preventDefault();
     }
-
-    if (isGameOver) return;
 
     let newDx = dx;
     let newDy = dy;
@@ -626,12 +647,12 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   function showMenu() {
-    const t = translations[currentLang] || translations.no;
     console.log("Vis meny");
     if (menu) {
       menu.style.display = "block";
     }
     isPaused = true;
+    const t = translations[currentLang] || translations.no;
     if (pauseBtn) {
       pauseBtn.textContent = t.pauseLabelResume;
     }
@@ -646,7 +667,6 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function endGame() {
     isGameOver = true;
-    clearInterval(gameInterval);
     console.log("Game over");
 
     if (score > 0) {
@@ -695,9 +715,9 @@ window.addEventListener("DOMContentLoaded", () => {
 
   function restartGame() {
     snake = [
-      { x: 10, y: 10 },
-      { x: 9,  y: 10 },
-      { x: 8,  y: 10 }
+      { x: 8, y: 8 },
+      { x: 7, y: 8 },
+      { x: 6, y: 8 }
     ];
     dx = 1;
     dy = 0;
@@ -706,10 +726,11 @@ window.addEventListener("DOMContentLoaded", () => {
     score = 0;
     scoreEl.textContent = score;
     isGameOver = false;
-    isPaused = false;
+    isPaused = true; // restart begynner også pauset
+
     const t = translations[currentLang] || translations.no;
     if (pauseBtn) {
-      pauseBtn.textContent = t.pauseLabelPause;
+      pauseBtn.textContent = t.pauseLabelResume;
     }
 
     clearInterval(gameInterval);
