@@ -28,7 +28,10 @@ window.addEventListener("DOMContentLoaded", () => {
       gameOver: "GAME OVER",
       gameOverHint: "Trykk Restart eller SPACE",
       pauseOverlay: "PAUSE",
-      pauseInfo: "Trykk SPACE for å pause"
+      pauseInfo: "Trykk SPACE for å pause",
+      modeLabel: "Modus",
+      modeClassic: "Classic",
+      modeSpecial: "Spesial-epler"
     },
     en: {
       title: "Snake",
@@ -52,7 +55,10 @@ window.addEventListener("DOMContentLoaded", () => {
       gameOver: "GAME OVER",
       gameOverHint: "Press Restart or SPACE",
       pauseOverlay: "PAUSED",
-      pauseInfo: "Press SPACE to pause"
+      pauseInfo: "Press SPACE to pause",
+      modeLabel: "Mode",
+      modeClassic: "Classic",
+      modeSpecial: "Special apples"
     }
   };
 
@@ -150,6 +156,9 @@ window.addEventListener("DOMContentLoaded", () => {
   const wrapLabelEl = document.getElementById("wrapLabel");
   const menuHintEl = document.getElementById("menuHint");
 
+  const modeLabelEl = document.getElementById("modeLabel");
+  const modeSelect = document.getElementById("modeSelect");
+
   // =======================================
   // GRID / SPILLDATA
   // =======================================
@@ -167,6 +176,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   let directionQueue = [];
 
+  /** foods: [{ x, y, type: "normal" | "gold" | "rotten" }] */
   let foods = [];
   let score = 0;
   let highscore = Number(localStorage.getItem("snakeHighscore")) || 0;
@@ -181,6 +191,11 @@ window.addEventListener("DOMContentLoaded", () => {
   if (appleCountSelect) {
     const val = parseInt(appleCountSelect.value, 10);
     appleCount = isNaN(val) ? 1 : val;
+  }
+
+  let gameMode = localStorage.getItem("snakeMode") || "classic";
+  if (modeSelect) {
+    modeSelect.value = gameMode;
   }
 
   let isGameOver = false;
@@ -219,6 +234,16 @@ window.addEventListener("DOMContentLoaded", () => {
 
     pauseBtn.textContent = isPaused ? t.pauseLabelResume : t.pauseLabelPause;
     restartBtn.textContent = t.restartLabel;
+
+    // gamemode-tekst
+    if (modeLabelEl) modeLabelEl.textContent = t.modeLabel;
+    if (modeSelect) {
+      const opts = modeSelect.options;
+      if (opts.length >= 2) {
+        opts[0].textContent = t.modeClassic;
+        opts[1].textContent = t.modeSpecial;
+      }
+    }
 
     if (languageSelect.value !== lang) {
       languageSelect.value = lang;
@@ -300,6 +325,14 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  if (modeSelect) {
+    modeSelect.addEventListener("change", () => {
+      gameMode = modeSelect.value || "classic";
+      localStorage.setItem("snakeMode", gameMode);
+      resetFoods();
+    });
+  }
+
   // =======================================
   // GAME LOOP
   // =======================================
@@ -357,7 +390,21 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     if (ateIndex !== -1) {
-      score++;
+      const eaten = foods[ateIndex];
+      let deltaScore = 1;
+      let shrinkBy = 0;
+
+      if (gameMode === "special") {
+        if (eaten.type === "gold") {
+          deltaScore = 3;
+        } else if (eaten.type === "rotten") {
+          deltaScore = -2;
+          shrinkBy = 2;
+        }
+      }
+
+      score += deltaScore;
+      if (score < 0) score = 0;
       scoreEl.textContent = score;
 
       if (score > highscore) {
@@ -366,7 +413,18 @@ window.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("snakeHighscore", highscore);
       }
 
-      foods[ateIndex] = randomFoodPosition(foods);
+      // shrink hvis råttent eple
+      if (shrinkBy > 0) {
+        for (let i = 0; i < shrinkBy; i++) {
+          if (snake.length > 3) {
+            snake.pop();
+          }
+        }
+      }
+
+      // spawne nytt eple på samme index
+      const newPos = randomFoodPosition(foods);
+      foods[ateIndex] = createFoodWithType(newPos);
     } else {
       snake.pop();
     }
@@ -385,15 +443,41 @@ window.addEventListener("DOMContentLoaded", () => {
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
 
-    for (const food of foods) {
-      ctx.drawImage(
-        sprites.apple,
-        food.x * tileSize,
-        food.y * tileSize,
-        tileSize,
-        tileSize
-      );
+    // tegn epler
+  for (const food of foods) {
+
+  let img = sprites.apple;
+
+  // glow for spesial mode
+  if (gameMode === "special") {
+    const cx = food.x * tileSize + tileSize / 2;
+    const cy = food.y * tileSize + tileSize / 2;
+
+    if (food.type === "gold") {
+      ctx.fillStyle = "rgba(250, 204, 21, 0.55)";
+      ctx.beginPath();
+      ctx.arc(cx, cy, tileSize * 0.65, 0, Math.PI * 2);
+      ctx.fill();
     }
+
+    if (food.type === "rotten") {
+      ctx.fillStyle = "rgba(34, 197, 94, 0.55)";
+      ctx.beginPath();
+      ctx.arc(cx, cy, tileSize * 0.65, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // tegn eplet oppå glowen
+  ctx.drawImage(
+    img,
+    food.x * tileSize,
+    food.y * tileSize,
+    tileSize,
+    tileSize
+  );
+}
+
 
     for (let i = 0; i < snake.length; i++) {
       drawSnakeSegment(i);
@@ -421,7 +505,7 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   // =======================================
-  // SLANGE-SEGMENT (GRID-BASERT, INGEN SMOOTH)
+  // SLANGE-SEGMENT
   // =======================================
   function drawSnakeSegment(index) {
     const segment = snake[index];
@@ -431,7 +515,6 @@ window.addEventListener("DOMContentLoaded", () => {
     const px = segment.x * tileSize;
     const py = segment.y * tileSize;
 
-    // HODE
     if (isHead) {
       if (dx === 1 && dy === 0) return ctx.drawImage(sprites.head_right, px, py, tileSize, tileSize);
       if (dx === -1 && dy === 0) return ctx.drawImage(sprites.head_left,  px, py, tileSize, tileSize);
@@ -439,7 +522,6 @@ window.addEventListener("DOMContentLoaded", () => {
       if (dy === 1  && dx === 0) return ctx.drawImage(sprites.head_down,  px, py, tileSize, tileSize);
     }
 
-    // HALE
     if (isTail) {
       const prev = snake[index - 1];
       if (prev.x < segment.x)  return ctx.drawImage(sprites.tail_right, px, py, tileSize, tileSize);
@@ -452,17 +534,14 @@ window.addEventListener("DOMContentLoaded", () => {
     const next = snake[index + 1];
     if (!prev || !next) return;
 
-    // Rett horisontal
     if (prev.y === segment.y && next.y === segment.y) {
       return ctx.drawImage(sprites.body_horizontal, px, py, tileSize, tileSize);
     }
 
-    // Rett vertikal
     if (prev.x === segment.x && next.x === segment.x) {
       return ctx.drawImage(sprites.body_vertical, px, py, tileSize, tileSize);
     }
 
-    // Hjørner
     if ((prev.x < segment.x && next.y < segment.y) ||
         (next.x < segment.x && prev.y < segment.y)) {
       return ctx.drawImage(sprites.body_topleft, px, py, tileSize, tileSize);
@@ -526,14 +605,12 @@ window.addEventListener("DOMContentLoaded", () => {
     if (e.key === " " || e.key === "Spacebar") {
       e.preventDefault();
 
-      // Spillet er pauset, ingen meny → start spill
       if (isPaused && (!menu || menu.style.display !== "block")) {
         isPaused = false;
         pauseBtn.textContent = t.pauseLabelPause;
         return;
       }
 
-      // Hvis menyen er åpen → lukk
       if (menu && menu.style.display === "block") {
         hideMenu();
         isPaused = false;
@@ -541,7 +618,6 @@ window.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // ellers: åpne meny
       showMenu();
       return;
     }
@@ -628,12 +704,26 @@ window.addEventListener("DOMContentLoaded", () => {
     return newPos;
   }
 
+  function createFoodWithType(pos) {
+    let type = "normal";
+    if (gameMode === "special") {
+      const r = Math.random();
+      if (r < 0.15) {
+        type = "rotten";
+      } else if (r < 0.40) {
+        type = "gold";
+      }
+    }
+    return { x: pos.x, y: pos.y, type };
+  }
+
   function resetFoods() {
     foods = [];
     const count = appleCount > 0 ? appleCount : 1;
 
     for (let i = 0; i < count; i++) {
-      foods.push(randomFoodPosition(foods));
+      const basePos = randomFoodPosition(foods);
+      foods.push(createFoodWithType(basePos));
     }
   }
 
