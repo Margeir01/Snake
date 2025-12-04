@@ -56,7 +56,7 @@ window.addEventListener("DOMContentLoaded", () => {
       pauseLabelPause: "Pause",
       pauseLabelResume: "Resume",
       restartLabel: "Restart",
-      noScores: "No scores yet",
+      noScores: "No global scores yet",
       gameOver: "GAME OVER",
       gameOverHint: "Press Restart or SPACE",
       pauseOverlay: "PAUSED",
@@ -164,11 +164,13 @@ window.addEventListener("DOMContentLoaded", () => {
   const modeLabelEl = document.getElementById("modeLabel");
   const modeSelect = document.getElementById("modeSelect");
 
+  const globalLeaderboardList = document.getElementById("globalLeaderboardList");
+
   // =======================================
   // GRID / SPILLDATA
   // =======================================
   const tileSize = 30;
-  const tileCount = canvas.width / tileSize; // 480 / 30 = 16
+  const tileCount = canvas.width / tileSize;
 
   let snake = [
     { x: 8, y: 8 },
@@ -189,7 +191,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   let playerName = localStorage.getItem("snakePlayerName") || "";
   let leaderboard = JSON.parse(localStorage.getItem("snakeLeaderboard") || "[]");
-  let globalLeaderboard = []; // KOMMER FRA FIREBASE
+  let globalLeaderboard = [];
 
   let wrapEnabled = wrapToggle ? wrapToggle.checked : false;
 
@@ -254,6 +256,7 @@ window.addEventListener("DOMContentLoaded", () => {
       languageSelect.value = lang;
     }
 
+    renderLeaderboard();
     renderGlobalLeaderboard();
     draw();
   }
@@ -271,7 +274,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   resetFoods();
   renderLeaderboard();
-  fetchGlobalLeaderboard(gameMode); // 🔥 hent global ved start
+  fetchGlobalLeaderboard(gameMode);
 
   // =======================================
   // EVENT LISTENERS
@@ -338,7 +341,7 @@ window.addEventListener("DOMContentLoaded", () => {
       gameMode = modeSelect.value || "classic";
       localStorage.setItem("snakeMode", gameMode);
       resetFoods();
-      fetchGlobalLeaderboard(gameMode); // 🔥 hent globale scores for valgt mode
+      fetchGlobalLeaderboard(gameMode);
     });
   }
 
@@ -499,6 +502,7 @@ window.addEventListener("DOMContentLoaded", () => {
       ctx.textAlign = "center";
       ctx.fillText(t.gameOver, canvas.width / 2, canvas.height / 2);
       ctx.font = "16px system-ui";
+      ctx.textAlign = "center";
       ctx.fillText(t.gameOverHint, canvas.width / 2, canvas.height / 2 + 30);
     }
   }
@@ -759,11 +763,11 @@ window.addEventListener("DOMContentLoaded", () => {
     console.log("Game over");
 
     if (score > 0) {
-      updateLeaderboard(playerName, score); // lokal
+      updateLeaderboard(playerName, score);
 
       if (playerName) {
-        sendScoreToFirebase(playerName, score, gameMode); // 🔥 global
-        fetchGlobalLeaderboard(gameMode);                 // oppdater lista
+        sendScoreToFirebase(playerName, score, gameMode);
+        fetchGlobalLeaderboard(gameMode);
       }
     }
   }
@@ -809,10 +813,9 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // ====== GLOBAL LEADERBOARD RENDER ======
   function renderGlobalLeaderboard() {
-    const list = document.getElementById("globalLeaderboardList");
-    if (!list) return;
+    if (!globalLeaderboardList) return;
 
-    list.innerHTML = "";
+    globalLeaderboardList.innerHTML = "";
 
     if (!globalLeaderboard || globalLeaderboard.length === 0) {
       const li = document.createElement("li");
@@ -820,36 +823,54 @@ window.addEventListener("DOMContentLoaded", () => {
         currentLang === "no"
           ? "Ingen globale scores ennå"
           : "No global scores yet";
-      list.appendChild(li);
+      globalLeaderboardList.appendChild(li);
       return;
     }
 
     globalLeaderboard.forEach((entry, index) => {
       const li = document.createElement("li");
       li.textContent = `${index + 1}. ${entry.name} – ${entry.score}`;
-      list.appendChild(li);
+      globalLeaderboardList.appendChild(li);
     });
   }
 
-  // ====== FIREBASE: SEND SCORE ======
+  // ====== KEY-SANITIZER FOR FIREBASE ======
+  function sanitizeKey(str) {
+    return str.replace(/[.#$/[\]]/g, "_");
+  }
+
+  // ====== FIREBASE: SEND SCORE (EN PER SPILLER+MODE) ======
   function sendScoreToFirebase(name, score, mode) {
     if (!name || score <= 0) return;
     if (!FIREBASE_URL) return;
+
+    const key = sanitizeKey(`${name}_${mode}`);
+    const url = `${FIREBASE_URL}/${key}.json`;
 
     const payload = {
       name,
       score,
       mode,
-      createdAt: Date.now()
+      updatedAt: Date.now()
     };
 
-    fetch(FIREBASE_URL + ".json", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    }).catch(err => {
-      console.error("Klarte ikke å sende score til Firebase:", err);
-    });
+    fetch(url)
+      .then(res => res.json())
+      .then(existing => {
+        if (existing && typeof existing.score === "number" && existing.score >= score) {
+          console.log("Global: eksisterende score er høyere eller lik, oppdaterer ikke.");
+          return;
+        }
+
+        return fetch(url, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      })
+      .catch(err => {
+        console.error("Klarte ikke å sende score til Firebase:", err);
+      });
   }
 
   // ====== FIREBASE: HENT GLOBAL LEADERBOARD ======
@@ -867,7 +888,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
         filtered.sort((a, b) => {
           if (b.score !== a.score) return b.score - a.score;
-          return (a.createdAt || 0) - (b.createdAt || 0);
+          return (a.updatedAt || 0) - (b.updatedAt || 0);
         });
 
         globalLeaderboard = filtered.slice(0, 10);
@@ -891,7 +912,7 @@ window.addEventListener("DOMContentLoaded", () => {
     score = 0;
     scoreEl.textContent = score;
     isGameOver = false;
-    isPaused = true; // restart begynner også pauset
+    isPaused = true;
 
     const t = translations[currentLang] || translations.no;
     if (pauseBtn) {
