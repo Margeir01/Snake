@@ -1,22 +1,42 @@
-/* ======== BODY / GLOBAL ======== */
+/* ======== BODY / LAYOUT ======== */
 body {
-  font-family: system-ui, sans-serif;
-  background: #111;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top, #1f2933 0, #020617 55%, #000 100%);
   color: #f5f5f5;
+  min-height: 100vh;
+  margin: 0;
   display: flex;
-  flex-direction: column;
+  justify-content: center;
   align-items: center;
-  gap: 18px;
-  margin-top: 30px;
 }
 
+/* Kort rundt spillet */
+.game-card {
+  background: #181818;
+  border-radius: 16px;
+  padding: 24px 28px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid #2b2b2b;
+}
+
+/* ======== TITLER / TEKST ======== */
 h1 {
   margin: 0;
   font-size: 2.2rem;
+  letter-spacing: 0.04em;
 }
 
 p {
-  font-size: 1.1rem;
+  margin: 0;
+  font-size: 1rem;
+}
+
+#pauseInfo {
+  font-size: 0.9rem;
+  opacity: 0.85;
 }
 
 /* ======== CANVAS ======== */
@@ -27,39 +47,75 @@ canvas {
   image-rendering: pixelated;
 }
 
-/* ======== INFO-BAR ======== */
+/* ======== INFO-BAR (score, highscore, knapper) ======== */
 .info {
   display: flex;
-  gap: 20px;
-  align-items: center;
-  font-size: 1.2rem;
+  gap: 24px;
+  align-items: flex-start;
+  font-size: 1rem;
+  flex-wrap: wrap;
+}
+
+.info > span {
+  background: #1e1e1e;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
 /* ======== BUTTONS ======== */
 button {
-  padding: 8px 14px;
+  padding: 8px 16px;
   border: none;
   cursor: pointer;
-  border-radius: 6px;
-  font-size: 1rem;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  background: linear-gradient(135deg, #3b82f6, #22c55e);
+  color: #f9fafb;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  transition: transform 0.1s ease, box-shadow 0.1s ease, opacity 0.1s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
+}
+
+button:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  opacity: 0.9;
 }
 
 /* ======== PLAYER BAR ======== */
 .player-bar {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   align-items: center;
-  margin-bottom: 10px;
-  font-size: 1.1rem;
+  font-size: 1rem;
+  justify-content: space-between;
 }
 
 .player-bar input {
   padding: 6px 10px;
-  font-size: 1rem;
+  font-size: 0.95rem;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: #111827;
+  color: #f9fafb;
 }
 
 .player-bar button {
   padding: 6px 12px;
+  font-size: 0.9rem;
+}
+
+/* ======== SPRÅK-SWITCH ======== */
+.lang-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 0.95rem;
 }
 
@@ -69,76 +125,40 @@ button {
   border: 1px solid #666;
   background: #2a2a2a;
   color: #fff;
-  font-size: 1rem;
+  font-size: 0.95rem;
   cursor: pointer;
-}
-
-.lang-switch select:focus {
-  outline: none;
-  border-color: #999;
-}
-
-.lang-switch {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 1rem;
 }
 
 /* ======== LEADERBOARD ======== */
 .leaderboard {
-  margin-top: 20px;
-  font-size: 1.1rem;
-  width: 200px;
+  font-size: 1rem;
+  min-width: 180px;
 }
 
 .leaderboard h2 {
-  margin: 8px 0;
-  font-size: 1.3rem;
-}
-
-.leaderboard ol {
-  padding-left: 20px;
-  margin: 0;
-}
-
-/* ======== OLD SETTINGS (if you keep them) ======== */
-.settings {
-  margin-top: 15px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  background: #1b1b1b;
-  border: 1px solid #333;
-  font-size: 0.95rem;
-}
-
-.settings h2 {
-  margin: 0 0 6px 0;
+  margin: 0 0 8px 0;
   font-size: 1.1rem;
 }
 
-.settings label {
-  cursor: pointer;
+.leaderboard ol {
+  padding-left: 18px;
+  margin: 0;
 }
 
-.settings input[type="checkbox"] {
-  margin-right: 6px;
-}
-
-/* ======== GAME WRAPPER ======== */
+/* ======== GAME WRAPPER (canvas + meny) ======== */
 .game-wrapper {
   position: relative;
   display: inline-block;
+  align-self: center;
 }
 
-
-/* ======== MENU OVERLAY ======== */
+/* ======== MENY OVER SPILLET ======== */
 .menu-overlay {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(15, 23, 42, 0.94);
   color: #fff;
   padding: 1.5rem 2rem;
   border-radius: 12px;
@@ -147,6 +167,7 @@ button {
   min-width: 260px;
   text-align: left;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+  border: 1px solid #4b5563;
 }
 
 .menu-overlay h2 {
@@ -162,15 +183,24 @@ button {
 
 .menu-overlay select {
   margin-left: 0.5rem;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid #4b5563;
+  background: #020617;
+  color: #e5e7eb;
 }
 
-.checkbox-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+.menu-overlay input[type="checkbox"] {
+  margin-right: 6px;
 }
 
-/* ======== MENU BUTTONS INSIDE MENU ======== */
+.menu-hint {
+  font-size: 0.85rem;
+  opacity: 0.85;
+  margin-top: 4px;
+}
+
+/* ======== MENY-KNAPPER ======== */
 .menu-buttons {
   margin-top: 1rem;
   display: flex;
@@ -180,4 +210,19 @@ button {
 
 .menu-overlay button {
   cursor: pointer;
+  background: #ef4444;
+  background: linear-gradient(135deg, #ef4444, #f97316);
+}
+
+/* ======== RESPONSIV LITT ======== */
+@media (max-width: 750px) {
+  .game-card {
+    transform: scale(0.9);
+  }
+}
+
+@media (max-width: 650px) {
+  .game-card {
+    transform: scale(0.8);
+  }
 }
