@@ -3,6 +3,11 @@ window.addEventListener("DOMContentLoaded", () => {
   console.log("DOM loaded, starter snake-spill…");
 
   // =======================================
+  // FIREBASE URL (din)
+  // =======================================
+  const FIREBASE_URL = "https://snake-fe815-default-rtdb.europe-west1.firebasedatabase.app/snakeScores";
+
+  // =======================================
   // SPRÅK-TEKSTER
   // =======================================
   const translations = {
@@ -184,6 +189,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   let playerName = localStorage.getItem("snakePlayerName") || "";
   let leaderboard = JSON.parse(localStorage.getItem("snakeLeaderboard") || "[]");
+  let globalLeaderboard = []; // KOMMER FRA FIREBASE
 
   let wrapEnabled = wrapToggle ? wrapToggle.checked : false;
 
@@ -214,7 +220,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
     titleEl.textContent = t.title;
     subtitleEl.textContent = t.subtitle;
-    pauseInfoEl.textContent = t.pauseInfo;
+    if (pauseInfoEl) pauseInfoEl.textContent = t.pauseInfo;
 
     langLabelEl.textContent = t.langLabel;
 
@@ -235,7 +241,6 @@ window.addEventListener("DOMContentLoaded", () => {
     pauseBtn.textContent = isPaused ? t.pauseLabelResume : t.pauseLabelPause;
     restartBtn.textContent = t.restartLabel;
 
-    // gamemode-tekst
     if (modeLabelEl) modeLabelEl.textContent = t.modeLabel;
     if (modeSelect) {
       const opts = modeSelect.options;
@@ -249,6 +254,7 @@ window.addEventListener("DOMContentLoaded", () => {
       languageSelect.value = lang;
     }
 
+    renderGlobalLeaderboard();
     draw();
   }
 
@@ -265,6 +271,7 @@ window.addEventListener("DOMContentLoaded", () => {
 
   resetFoods();
   renderLeaderboard();
+  fetchGlobalLeaderboard(gameMode); // 🔥 hent global ved start
 
   // =======================================
   // EVENT LISTENERS
@@ -298,6 +305,7 @@ window.addEventListener("DOMContentLoaded", () => {
         currentPlayerNameEl.textContent = lang === "no" ? "Ingen" : "None";
       }
       renderLeaderboard();
+      renderGlobalLeaderboard();
     });
   }
 
@@ -330,6 +338,7 @@ window.addEventListener("DOMContentLoaded", () => {
       gameMode = modeSelect.value || "classic";
       localStorage.setItem("snakeMode", gameMode);
       resetFoods();
+      fetchGlobalLeaderboard(gameMode); // 🔥 hent globale scores for valgt mode
     });
   }
 
@@ -413,7 +422,6 @@ window.addEventListener("DOMContentLoaded", () => {
         localStorage.setItem("snakeHighscore", highscore);
       }
 
-      // shrink hvis råttent eple
       if (shrinkBy > 0) {
         for (let i = 0; i < shrinkBy; i++) {
           if (snake.length > 3) {
@@ -422,7 +430,6 @@ window.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      // spawne nytt eple på samme index
       const newPos = randomFoodPosition(foods);
       foods[ateIndex] = createFoodWithType(newPos);
     } else {
@@ -444,40 +451,32 @@ window.addEventListener("DOMContentLoaded", () => {
     }
 
     // tegn epler
-  for (const food of foods) {
+    for (const food of foods) {
+      if (gameMode === "special") {
+        const cx = food.x * tileSize + tileSize / 2;
+        const cy = food.y * tileSize + tileSize / 2;
 
-  let img = sprites.apple;
+        if (food.type === "gold") {
+          ctx.fillStyle = "rgba(250, 204, 21, 0.55)";
+          ctx.beginPath();
+          ctx.arc(cx, cy, tileSize * 0.6, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (food.type === "rotten") {
+          ctx.fillStyle = "rgba(34, 197, 94, 0.4)";
+          ctx.beginPath();
+          ctx.arc(cx, cy, tileSize * 0.55, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
 
-  // glow for spesial mode
-  if (gameMode === "special") {
-    const cx = food.x * tileSize + tileSize / 2;
-    const cy = food.y * tileSize + tileSize / 2;
-
-    if (food.type === "gold") {
-      ctx.fillStyle = "rgba(250, 204, 21, 0.55)";
-      ctx.beginPath();
-      ctx.arc(cx, cy, tileSize * 0.65, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.drawImage(
+        sprites.apple,
+        food.x * tileSize,
+        food.y * tileSize,
+        tileSize,
+        tileSize
+      );
     }
-
-    if (food.type === "rotten") {
-      ctx.fillStyle = "rgba(34, 197, 94, 0.55)";
-      ctx.beginPath();
-      ctx.arc(cx, cy, tileSize * 0.65, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  // tegn eplet oppå glowen
-  ctx.drawImage(
-    img,
-    food.x * tileSize,
-    food.y * tileSize,
-    tileSize,
-    tileSize
-  );
-}
-
 
     for (let i = 0; i < snake.length; i++) {
       drawSnakeSegment(i);
@@ -760,7 +759,12 @@ window.addEventListener("DOMContentLoaded", () => {
     console.log("Game over");
 
     if (score > 0) {
-      updateLeaderboard(playerName, score);
+      updateLeaderboard(playerName, score); // lokal
+
+      if (playerName) {
+        sendScoreToFirebase(playerName, score, gameMode); // 🔥 global
+        fetchGlobalLeaderboard(gameMode);                 // oppdater lista
+      }
     }
   }
 
@@ -801,6 +805,77 @@ window.addEventListener("DOMContentLoaded", () => {
       li.textContent = `${index + 1}. ${entry.name} – ${entry.score}`;
       leaderboardList.appendChild(li);
     });
+  }
+
+  // ====== GLOBAL LEADERBOARD RENDER ======
+  function renderGlobalLeaderboard() {
+    const list = document.getElementById("globalLeaderboardList");
+    if (!list) return;
+
+    list.innerHTML = "";
+
+    if (!globalLeaderboard || globalLeaderboard.length === 0) {
+      const li = document.createElement("li");
+      li.textContent =
+        currentLang === "no"
+          ? "Ingen globale scores ennå"
+          : "No global scores yet";
+      list.appendChild(li);
+      return;
+    }
+
+    globalLeaderboard.forEach((entry, index) => {
+      const li = document.createElement("li");
+      li.textContent = `${index + 1}. ${entry.name} – ${entry.score}`;
+      list.appendChild(li);
+    });
+  }
+
+  // ====== FIREBASE: SEND SCORE ======
+  function sendScoreToFirebase(name, score, mode) {
+    if (!name || score <= 0) return;
+    if (!FIREBASE_URL) return;
+
+    const payload = {
+      name,
+      score,
+      mode,
+      createdAt: Date.now()
+    };
+
+    fetch(FIREBASE_URL + ".json", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).catch(err => {
+      console.error("Klarte ikke å sende score til Firebase:", err);
+    });
+  }
+
+  // ====== FIREBASE: HENT GLOBAL LEADERBOARD ======
+  function fetchGlobalLeaderboard(mode) {
+    if (!FIREBASE_URL) return;
+
+    fetch(FIREBASE_URL + ".json")
+      .then(res => res.json())
+      .then(data => {
+        const arr = Object.values(data || {});
+
+        const filtered = mode
+          ? arr.filter(entry => entry.mode === mode)
+          : arr;
+
+        filtered.sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return (a.createdAt || 0) - (b.createdAt || 0);
+        });
+
+        globalLeaderboard = filtered.slice(0, 10);
+        renderGlobalLeaderboard();
+      })
+      .catch(err => {
+        console.error("Feil ved henting av global leaderboard:", err);
+      });
   }
 
   function restartGame() {
